@@ -53,7 +53,7 @@ export const SIZES = [8, 12, 16, 24, 32];
 // Questions per request. Jev evaluates every question in a request against the
 // same state in parallel, so bigger batches mean fewer round trips, bounded by
 // the 64k-token request budget.
-const QUESTIONS_PER_BATCH = {
+export const QUESTIONS_PER_BATCH = {
   palette: 144,
   hsl: 144 * 3,
   rgb: 256 * 3,
@@ -182,15 +182,30 @@ function distribution(answer, labels) {
   return p.map((v) => v / sum);
 }
 
+// What Jev reported on top of the distribution: its selected label or expected
+// score, and its own confidence in it. Noul answers carry none of these (the
+// probability of "yes" is the whole answer), so the result may be empty.
+function reported(answer) {
+  const out = {};
+  if (typeof answer?.choice === "string") out.choice = answer.choice;
+  if (typeof answer?.score === "number") out.score = answer.score;
+  if (typeof answer?.confidence === "number") out.confidence = answer.confidence;
+  return out;
+}
+
 // Pack raw answers into the compact, renderer-facing shape. Nothing here is
 // collapsed to a single colour: the full distribution is what gets painted.
+// Jev's reported choice/score/confidence ride along for the working panel.
 export function pack(answers, method, size, prompt) {
   const pixels = [];
   for (let y = 0; y < size; y++)
     for (let x = 0; x < size; x++) {
       const key = pixelKey(x, y);
       if (method === "palette")
-        pixels.push({ probabilities: distribution(answers[key], PALETTE_NAMES) });
+        pixels.push({
+          probabilities: distribution(answers[key], PALETTE_NAMES),
+          reported: reported(answers[key]),
+        });
       else if (method === "silhouette")
         pixels.push({ foreground: probability(answers[key]?.noul) });
       else if (method === "rgb")
@@ -208,6 +223,11 @@ export function pack(answers, method, size, prompt) {
             answers[`${key}_lightness`],
             LIGHTNESS_LEVELS.map((_, i) => String(i)),
           ),
+          reported: {
+            hue: reported(answers[`${key}_hue`]),
+            saturation: reported(answers[`${key}_saturation`]),
+            lightness: reported(answers[`${key}_lightness`]),
+          },
         });
     }
   return { method, size, prompt, pixels, palette: Object.values(PALETTE) };

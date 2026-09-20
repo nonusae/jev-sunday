@@ -37,5 +37,11 @@ export async function generate(
   await Promise.all(
     Array.from({ length: Math.min(concurrency, batches.length) }, worker),
   );
-  return { ...pack(answers, method, size, text), model, usage, batches: batches.length };
+  return {
+    ...pack(answers, method, size, text),
+    state,
+    model,
+    usage,
+    batches: batches.length,
+  };
 }

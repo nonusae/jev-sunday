@@ -10,6 +10,11 @@ import { generate } from "./src/jev.mjs";
 import { METHODS, SIZES } from "./src/questions.mjs";
 
 const WEB = fileURLToPath(new URL("./web/", import.meta.url));
+// Pure modules the browser may import so the working panel can show the exact
+// state and question text that src/ builds, without duplicating it in web/.
+const SHARED = {
+  "/src/questions.mjs": fileURLToPath(new URL("./src/questions.mjs", import.meta.url)),
+};
 const port = Number(process.argv[process.argv.indexOf("--port") + 1]) || 8791;
 const hasKey = Boolean(process.env.TYPESAFE_API_KEY);
 
@@ -46,8 +51,8 @@ async function readJson(req, limit = 16_384) {
 
 async function serveStatic(res, url) {
   const path = normalize(url === "/" ? "/index.html" : url).replace(/^(\.\.[/\\])+/, "");
-  const file = join(WEB, path);
-  if (!file.startsWith(WEB)) return send(res, 403, { error: "Forbidden" });
+  const file = SHARED[path] ?? join(WEB, path);
+  if (!SHARED[path] && !file.startsWith(WEB)) return send(res, 403, { error: "Forbidden" });
   try {
     if (!(await stat(file)).isFile()) throw new Error();
     send(res, 200, await readFile(file), types[extname(file)] || "application/octet-stream");

@@ -25,6 +25,18 @@ Open the page, pick a representation and grid size in Settings, type a prompt,
 press Paint. Each painting joins a carousel. Settings also shows the model,
 request count, input tokens, and timings for the selected painting.
 
+The **Jev's working** panel on the right (open by default on wide screens,
+toggled with the Working button) shows the reasoning behind the selected
+painting: the decision grid (top colour per pixel) next to a spread map (entropy
+of each pixel's colours, the same number that drives the brushwork), summary
+statistics (mean reported confidence, share of pixels that get strokes), the
+question set and batch layout, and the exact state object sent with every
+request. Hover the painting or the mini grids to inspect one pixel: the typed
+question Jev was asked, its reported choice or score and confidence, the full
+probability distribution as bars, and how the renderer treats that pixel. Click
+to pin a pixel. Noul answers (silhouette, RGB) carry no reported confidence, so
+the panel shows p(yes) for those instead.
+
 ## How it fits together
 
 ![System architecture: browser, local Node server, TypeSafe SDK, Jev](docs/system-architecture.png)
@@ -77,7 +89,9 @@ state, which is why hundreds of tiny questions per request is the natural shape.
 
 `pack()` reads the answers back. It keeps the **full distribution**
 (`probabilities` for Choice/Score, `noul` for Noul), never just the top choice.
-That distribution is the painting's raw material.
+That distribution is the painting's raw material. Jev's own `choice`/`score`
+and `confidence` ride along in a `reported` field for the working panel; the
+renderer never reads them.
 
 ### `src/jev.mjs`: running the batches
 
@@ -146,11 +160,14 @@ for each painting so you can see what a size costs before going bigger.
 
 ## Files
 
-- `server.mjs`: static files + `POST /api/paint`
+- `server.mjs`: static files + `POST /api/paint` (also serves `src/questions.mjs`
+  so the working panel shows the exact question text without duplicating it)
 - `src/questions.mjs`: state, per-pixel questions, batching, answer packing
 - `src/jev.mjs`: SDK client and concurrent batch runner
 - `web/art.mjs`: distributions → colours, means, entropy inputs
 - `web/renderer.mjs`: painting algorithm
+- `web/working.mjs`: the Jev's working panel (state, questions, decision and
+  spread grids, per-pixel inspector)
 - `web/paint-worker.mjs`, `web/app.mjs`, `web/index.html`, `web/style.css`: UI
 
 ## License

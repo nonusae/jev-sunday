@@ -1,8 +1,11 @@
 // Gallery + prompt UI. Asks the local server for Jev's distributions, then
 // paints them in a worker so the page stays responsive.
+import { createWorkingPanel } from "./working.mjs";
+
 const SIZES = [8, 12, 16, 24, 32];
 const $ = (id) => document.getElementById(id);
 const cards = [];
+const results = new WeakMap(); // card -> Jev result
 let selected = 0, busy = false, worker = null, jobId = 0;
 const jobs = new Map();
 
@@ -11,6 +14,16 @@ const status = (message = "") => ($("status").textContent = message);
 function sidebar(open) {
   $("sidebar").hidden = !open;
   $("toggle").setAttribute("aria-expanded", String(open));
+}
+const working = createWorkingPanel({
+  body: $("workingBody"),
+  onInspect: (i, pin) => (pin ? working.pin(i) : working.hover(i)),
+});
+function workingPanel(open) {
+  $("working").hidden = !open;
+  $("workingToggle").setAttribute("aria-expanded", String(open));
+  document.body.classList.toggle("working-open", open);
+  if (cards.length) navigate(selected);
 }
 
 function navigate(index) {
@@ -26,6 +39,7 @@ function navigate(index) {
   $("next").disabled = selected === cards.length - 1;
   $("navigation").hidden = cards.length < 2;
   showMeta(card);
+  if (results.has(card)) working.show(results.get(card));
 }
 
 function showMeta(card) {
@@ -96,6 +110,17 @@ async function paint(result, card) {
   });
   card.querySelector(".loading-wash")?.remove();
   card.append(canvas);
+  results.set(card, result);
+  const pixelAt = (e) => {
+    const r = canvas.getBoundingClientRect();
+    const x = Math.min(result.size - 1, Math.floor(((e.clientX - r.left) / r.width) * result.size));
+    const y = Math.min(result.size - 1, Math.floor(((e.clientY - r.top) / r.height) * result.size));
+    return y * result.size + x;
+  };
+  canvas.onmousemove = (e) => cards[selected] === card && working.hover(pixelAt(e));
+  canvas.onmouseleave = () => cards[selected] === card && working.hover(null);
+  canvas.onclick = (e) => cards[selected] === card && working.pin(pixelAt(e));
+  if (cards[selected] === card) working.show(result);
   card.classList.remove("loading");
   card.setAttribute("aria-label", result.prompt);
   showMeta(card);
@@ -126,14 +151,17 @@ $("promptForm").onsubmit = async (event) => {
   $("generate").disabled = true;
   status();
   const card = begin();
+  const method = $("method").value, size = Number($("size").value);
+  working.pending({ prompt, method, size });
   try {
-    const result = await askJev(prompt, $("method").value, Number($("size").value));
+    const result = await askJev(prompt, method, size);
     await paint(result, card);
   } catch (error) {
     card.remove();
     cards.pop();
     if (cards.length) navigate(cards.length - 1);
     else {
+      working.show(null);
       $("track").innerHTML = '<div class="art-card active blank"><div class="canvas-bottom"></div></div>';
       $("track").style.transform = "";
       $("navigation").hidden = true;
@@ -152,6 +180,12 @@ $("previous").onclick = () => navigate(selected - 1);
 $("next").onclick = () => navigate(selected + 1);
 $("toggle").onclick = () => sidebar($("sidebar").hidden);
 $("close").onclick = () => sidebar(false);
+$("workingToggle").onclick = () => workingPanel($("working").hidden);
+$("closeWorking").onclick = () => workingPanel(false);
+working.show(null);
+const desktop = matchMedia("(min-width: 1100px)");
+workingPanel(desktop.matches);
+desktop.onchange = () => !desktop.matches && workingPanel(false); // narrowing closes; widening leaves the user's choice alone
 $("prompt").onkeydown = (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
@@ -159,4 +193,8 @@ $("prompt").onkeydown = (e) => {
   }
 };
 window.addEventListener("resize", () => cards.length && navigate(selected));
-document.addEventListener("keydown", (e) => e.key === "Escape" && !$("sidebar").hidden && sidebar(false));
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if (!$("sidebar").hidden) sidebar(false);
+  else if (!$("working").hidden && !desktop.matches) workingPanel(false);
+});

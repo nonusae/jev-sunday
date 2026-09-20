@@ -56,6 +56,34 @@ test("pack turns answers into normalised per-pixel distributions", () => {
   const sum = packed.pixels[0].probabilities.reduce((a, b) => a + b, 0);
   assert.ok(Math.abs(sum - 1) < 1e-9);
   assert.equal(packed.palette.length, 16);
+  // Jev's own choice and confidence ride along for the working panel.
+  assert.deepEqual(packed.pixels[0].reported, { choice: "red", confidence: 0.5 });
+});
+
+test("pack keeps reported score/confidence for hsl and none for noul answers", () => {
+  const answers = {};
+  for (let y = 0; y < 8; y++)
+    for (let x = 0; x < 8; x++) {
+      answers[`x${x}_y${y}_hue`] = {
+        type: "choice", choice: "blue", confidence: 0.7,
+        probabilities: Object.fromEntries(HUES.map((h) => [h, h === "blue" ? 0.7 : 0.3 / 8])),
+      };
+      answers[`x${x}_y${y}_saturation`] = {
+        type: "score", score: 1.4, confidence: 0.6, probabilities: { 0: 0.1, 1: 0.4, 2: 0.5 },
+      };
+      answers[`x${x}_y${y}_lightness`] = {
+        type: "score", score: 2, confidence: 0.9, probabilities: { 0: 0, 1: 0.05, 2: 0.9, 3: 0.05, 4: 0 },
+      };
+    }
+  const hsl = pack(answers, "hsl", 8, "test");
+  assert.deepEqual(hsl.pixels[0].reported, {
+    hue: { choice: "blue", confidence: 0.7 },
+    saturation: { score: 1.4, confidence: 0.6 },
+    lightness: { score: 2, confidence: 0.9 },
+  });
+  const noul = {};
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) noul[`x${x}_y${y}`] = { type: "noul", noul: 0.8 };
+  assert.equal(pack(noul, "silhouette", 8, "x").pixels[0].reported, undefined);
 });
 
 test("pack rejects incomplete or invalid answers", () => {
