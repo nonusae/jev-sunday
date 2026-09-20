@@ -1,0 +1,229 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "How a prompt is modelled as Jev state and questions",
+    "viewBox": [
+      1000,
+      480
+    ],
+    "column_fit": "spread",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "modelling",
+        "label": "State + questions",
+        "focus": [
+          "server",
+          "questions"
+        ],
+        "note": "One shared state object, then one or more typed questions per pixel."
+      },
+      {
+        "id": "batching",
+        "label": "Batches to Jev",
+        "focus": [
+          "bridge",
+          "jev"
+        ],
+        "note": "Every request carries the same state; batches run four at a time."
+      },
+      {
+        "id": "answers",
+        "label": "Answers back",
+        "focus": [
+          "jev",
+          "bridge",
+          "server",
+          "browser"
+        ],
+        "note": "Answers come back keyed by question ID with full probabilities, then pack() keeps all of them."
+      }
+    ]
+  },
+  "participants": [
+    {
+      "id": "browser",
+      "type": "frontend",
+      "label": "Browser",
+      "sublabel": "app.mjs"
+    },
+    {
+      "id": "server",
+      "type": "backend",
+      "label": "server.mjs",
+      "sublabel": "POST /api/paint"
+    },
+    {
+      "id": "questions",
+      "type": "backend",
+      "label": "questions.mjs",
+      "sublabel": "state + questions"
+    },
+    {
+      "id": "bridge",
+      "type": "backend",
+      "label": "jev.mjs",
+      "sublabel": "TypeSafeClient"
+    },
+    {
+      "id": "jev",
+      "type": "external",
+      "label": "Jev",
+      "sublabel": "jev-1.13.0"
+    }
+  ],
+  "segments": [
+    {
+      "from": 156,
+      "to": 264,
+      "label": "Model"
+    },
+    {
+      "from": 268,
+      "to": 322,
+      "label": "Send batches"
+    },
+    {
+      "from": 326,
+      "to": 410,
+      "label": "Answers → distributions"
+    }
+  ],
+  "messages": [
+    {
+      "id": "post",
+      "from": "browser",
+      "to": "server",
+      "y": 164,
+      "label": "{ prompt, method, size }",
+      "variant": "emphasis"
+    },
+    {
+      "id": "build",
+      "from": "server",
+      "to": "questions",
+      "y": 193,
+      "label": "buildRequests(prompt, method, size)"
+    },
+    {
+      "id": "state",
+      "from": "questions",
+      "to": "bridge",
+      "y": 222,
+      "label": "state: { image_description, width, height, coordinates, task }",
+      "variant": "emphasis"
+    },
+    {
+      "id": "pixelq",
+      "from": "questions",
+      "to": "bridge",
+      "y": 251,
+      "label": "questions: x3_y5 → choice(16 colours) | noul(inside? channel ON?) | score(levels)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "send",
+      "from": "bridge",
+      "to": "jev",
+      "y": 280,
+      "label": "systemOne({ model: jev-latest, state, questions })",
+      "variant": "emphasis"
+    },
+    {
+      "id": "answers",
+      "from": "jev",
+      "to": "bridge",
+      "y": 309,
+      "label": "answers: { x3_y5: { choice, probabilities, confidence } }, usage",
+      "variant": "return"
+    },
+    {
+      "id": "pack",
+      "from": "bridge",
+      "to": "questions",
+      "y": 338,
+      "label": "pack(answers)",
+      "variant": "default"
+    },
+    {
+      "id": "dist",
+      "from": "questions",
+      "to": "server",
+      "y": 367,
+      "label": "{ pixels: [{ probabilities }…], palette }",
+      "variant": "return"
+    },
+    {
+      "id": "json",
+      "from": "server",
+      "to": "browser",
+      "y": 396,
+      "label": "JSON + model, usage, ms",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "server",
+      "from": 160,
+      "to": 402,
+      "type": "backend"
+    },
+    {
+      "participant": "questions",
+      "from": 189,
+      "to": 258,
+      "type": "backend"
+    },
+    {
+      "participant": "bridge",
+      "from": 218,
+      "to": 344,
+      "type": "backend"
+    },
+    {
+      "participant": "jev",
+      "from": 276,
+      "to": 315,
+      "type": "external"
+    },
+    {
+      "participant": "questions",
+      "from": 334,
+      "to": 373,
+      "type": "backend"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "The state object",
+      "items": [
+        "image_description: the prompt",
+        "width, height: grid size",
+        "coordinates: (0,0) top-left, x right, y down",
+        "task: one coherent pixel-art image, no text"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "One question per judgment",
+      "items": [
+        "choice: 'What colour is pixel (x=3, y=5)?' + 16 colour names",
+        "noul: 'Is pixel (x=3, y=5) inside the silhouette?'",
+        "score: 'How light is pixel (x=3, y=5)?' + 5 levels",
+        "IDs like x3_y5 are hidden from Jev; coords live in the text"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "What comes back",
+      "items": [
+        "Answers keyed by the same IDs",
+        "choice → probabilities + confidence; noul → P(yes); score → per-level probabilities",
+        "pack() keeps every probability, not just the top answer"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,287 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "jev-van-gogh: how a prompt becomes a painting",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "request-path",
+        "label": "Prompt to Jev",
+        "focus": [
+          "ui",
+          "server",
+          "questions",
+          "bridge",
+          "jev"
+        ],
+        "note": "The prompt becomes hundreds of typed per-pixel questions sent to Jev in concurrent batches."
+      },
+      {
+        "id": "jev-model",
+        "label": "Jev and the key",
+        "focus": [
+          "env",
+          "bridge",
+          "jev",
+          "pack"
+        ],
+        "note": "The SDK holds the key server-side; Jev returns probabilities, never an image."
+      },
+      {
+        "id": "painting",
+        "label": "Distributions to paint",
+        "focus": [
+          "pack",
+          "worker",
+          "canvas"
+        ],
+        "note": "The full distribution per pixel drives underpainting, strokes, and relief."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "ui",
+      "type": "frontend",
+      "label": "Studio UI",
+      "sublabel": "app.mjs",
+      "pos": [
+        60,
+        250
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "server",
+      "type": "backend",
+      "label": "server.mjs",
+      "sublabel": "POST /api/paint",
+      "pos": [
+        320,
+        250
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "tag": "127.0.0.1:8791"
+    },
+    {
+      "id": "questions",
+      "type": "backend",
+      "label": "questions.mjs",
+      "sublabel": "buildRequests()",
+      "pos": [
+        580,
+        250
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "bridge",
+      "type": "backend",
+      "label": "jev.mjs",
+      "sublabel": "TypeSafeClient",
+      "pos": [
+        840,
+        250
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "tag": "4 concurrent"
+    },
+    {
+      "id": "env",
+      "type": "security",
+      "label": ".env",
+      "sublabel": "TYPESAFE_API_KEY",
+      "pos": [
+        840,
+        80
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "jev",
+      "type": "external",
+      "label": "Jev",
+      "sublabel": "/v1/systemone",
+      "pos": [
+        1100,
+        250
+      ],
+      "size": [
+        160,
+        64
+      ],
+      "tag": "jev-1.13.0"
+    },
+    {
+      "id": "pack",
+      "type": "backend",
+      "label": "pack()",
+      "sublabel": "answers → distributions",
+      "pos": [
+        840,
+        410
+      ],
+      "size": [
+        140,
+        64
+      ]
+    },
+    {
+      "id": "worker",
+      "type": "frontend",
+      "label": "paint-worker.mjs",
+      "sublabel": "art + renderer",
+      "pos": [
+        320,
+        410
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "tag": "560×560"
+    },
+    {
+      "id": "canvas",
+      "type": "frontend",
+      "label": "Canvas",
+      "sublabel": "carousel",
+      "pos": [
+        60,
+        410
+      ],
+      "size": [
+        140,
+        64
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Browser",
+      "wraps": [
+        "ui",
+        "worker",
+        "canvas"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Local Node server (loopback only)",
+      "wraps": [
+        "server",
+        "questions",
+        "bridge",
+        "env",
+        "pack"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "prompt",
+      "from": "ui",
+      "to": "server",
+      "label": "prompt, method, size",
+      "variant": "emphasis"
+    },
+    {
+      "id": "build",
+      "from": "server",
+      "to": "questions",
+      "label": "prompt, grid"
+    },
+    {
+      "id": "batches",
+      "from": "questions",
+      "to": "bridge",
+      "label": "state + batches"
+    },
+    {
+      "id": "systemone",
+      "from": "bridge",
+      "to": "jev",
+      "label": "systemOne() HTTPS",
+      "variant": "emphasis"
+    },
+    {
+      "id": "key",
+      "from": "env",
+      "to": "bridge",
+      "label": "API key",
+      "variant": "security",
+      "labelDy": 24
+    },
+    {
+      "id": "answers",
+      "from": "jev",
+      "to": "pack",
+      "label": "answers: probabilities",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "right"
+    },
+    {
+      "id": "json",
+      "from": "pack",
+      "to": "worker",
+      "label": "JSON → app.mjs → postMessage",
+      "variant": "dashed"
+    },
+    {
+      "id": "bitmap",
+      "from": "worker",
+      "to": "canvas",
+      "label": "ImageBitmap"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "Typed questions per pixel",
+      "items": [
+        "Palette: one choice over 16 colours",
+        "Silhouette: one noul (inside subject?)",
+        "RGB: three nouls (channel ON?)",
+        "HSL: choice hue + score saturation + score lightness"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Batching and the model",
+      "items": [
+        "Every batch carries the same state: prompt, size, coordinate rule, task",
+        "Palette: 144 questions per request; 24×24 = 4 requests",
+        "jev-latest resolves to jev-1.13.0; billed per input token",
+        "8×8 palette test: 1 request, 8,547 tokens, 1.6 s"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Painting from probabilities",
+      "items": [
+        "Underpainting = probability-weighted mean colour",
+        "Strokes sampled from the distribution with smooth noise",
+        "Stroke density and relief follow per-pixel entropy",
+        "Height map blurred and lit from upper-left"
+      ]
+    }
+  ]
+}

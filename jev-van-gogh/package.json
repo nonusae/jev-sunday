@@ -1,0 +1,17 @@
+{
+  "name": "jev-van-gogh",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Turn Jev's per-pixel probability distributions into oil paintings.",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "preview": "node scripts/preview.mjs",
+    "diagrams": "node scripts/export-diagram.mjs docs/system-architecture.html && node scripts/export-diagram.mjs docs/jev-request-sequence.html"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@typesafe-ai/sdk": "^0.6.0"
+  }
+}
